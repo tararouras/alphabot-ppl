@@ -1,0 +1,37 @@
+FROM ubuntu:18.04
+
+WORKDIR /tmp
+
+RUN apt update && \
+    apt install -yq --no-install-recommends \
+        python \
+        python-pip \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip install \
+    setuptools \
+    wheel
+
+COPY ./edge_server_requirements.txt .
+
+RUN pip install -r edge_server_requirements.txt
+
+COPY edge_server/ edge_server/
+
+COPY setup.py .
+
+RUN pip install .
+
+COPY edge_server/config.yaml /etc/config.yaml
+
+RUN rm -r /tmp/*
+
+ENV EDGE_SERVER_CONFIG_PATH /etc/config.yaml
+ENV EDGE_SERVER_IP_ADDR 0.0.0.0
+ENV EDGE_SERVER_PORT 8000
+
+ENTRYPOINT edge-server

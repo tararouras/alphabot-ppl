@@ -5,8 +5,19 @@ import cv2
 import math
 from alphabot_exceptions import *
 import yaml
+import os
 
-CONFIG = yaml.load(open("./config.yaml"))
+CONFIG_DEFAULT_PATH = './config.yaml'
+CONFIG_PATH = os.getenv('EDGE_SERVER_CONFIG_PATH')
+CONFIG = ''
+
+if CONFIG_PATH is None:
+    print ("Environmemnt variable 'EGDE_SERVER_CONFIG_PATH' is not set, using "
+           "default path: %s" % CONFIG_DEFAULT_PATH)
+    CONFIG_PATH = CONFIG_DEFAULT_PATH
+
+with open(CONFIG_PATH, 'r') as fc:
+    CONFIG = yaml.load(fc)
 
 # initialize the known object width (cm), which in this case is the beacon
 KNOWN_WIDTH = CONFIG["beacon"]["real_width"]
@@ -15,7 +26,7 @@ KNOWN_WIDTH = CONFIG["beacon"]["real_width"]
 DIST_FROM_CENTRE = CONFIG["beacon"]["distance_from_reference_pic"]
 
 # x-centre-coordinate of the 2596x1944 resolution picture
-PIC_CENTRE_WIDTH = CONFIG["camera"]["pic_centre_width"] 
+PIC_CENTRE_WIDTH = CONFIG["camera"]["pic_centre_width"]
 FOCAL_LENGTH = CONFIG["camera"]["focal_length"]
 
 # define the list of HSV boundaries (red, blue, purple, yellow, orange)
@@ -29,8 +40,8 @@ class Dna(object):
         # transfer to HSV colour space
         image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 	color = 0
-	curr_width = 0	
-	# loop over the boundaries, find the most fitting color 
+	curr_width = 0
+	# loop over the boundaries, find the most fitting color
 	for boundaries in COLOR_BOUNDARIES:
 		print("")
     		if (color == 0):
@@ -42,18 +53,18 @@ class Dna(object):
     		elif (color == 3):
         		print("Looking for the Yellow Beacon...")
     		else:
-        		print("Looking for the Orange Beacon...")		
+        		print("Looking for the Orange Beacon...")
     		for (lower, upper) in boundaries:
 			# create NumPy arrays from the boundaries
         		lower = np.array(lower, dtype = "uint8")
-        		upper = np.array(upper, dtype = "uint8") 
+        		upper = np.array(upper, dtype = "uint8")
         		# find the colors within the specified boundaries and apply
         		# the mask
         		mask = cv2.inRange(image, lower, upper)
                         # If searching for red, combine masks
                         if (color == 0):
                             mask = mask | cv2.inRange(image, np.array([0, 140, 115]), np.array([5, 200, 200]))
- 
+
                         try:
 				# find contour based on colour
         	                cnts = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -62,7 +73,7 @@ class Dna(object):
 			    	marker = cv2.minAreaRect(c)
 
 			    	# Always looking for cylinders sitting on their bottom
-            		    	if (marker[1][0] < marker[1][1]): 
+            		    	if (marker[1][0] < marker[1][1]):
                 	    		width = marker[1][0]
                 			height = marker[1][1]
                 			angle = marker[2]
@@ -71,7 +82,7 @@ class Dna(object):
                 			raise BeaconNotValidError
             			print("Candidate contour width, height and angle:")
             			print round(width), round(height), round(angle, 2)
-            
+
             			# Check if feasible beacon marker
                                 # 0: (WEAK) width must be greater than 100 pixels
                                 if not(width >= 100):
@@ -82,11 +93,11 @@ class Dna(object):
             			# 2: angle must be within the range of [-5, 5]
             			elif not(angle >= -5 and angle <= 5):
                 			raise BeaconNotValidError
-			
+
                         except (BeaconNotValidError, ValueError):
 				print('Not found!')
                                 width = 0
-            			continue	
+            			continue
 		if (width > curr_width):
             		curr_color = color
             		curr_width = width
@@ -110,16 +121,16 @@ class Dna(object):
 	elif (curr_color == 3):
     		print("\nYellow Beacon identified!")
 	else:
-    		print("\nOrange Beacon identified!")	
-        
+    		print("\nOrange Beacon identified!")
+
         return curr_cnt, curr_color
-    
+
     # Calculate detected Beacon's contour
     def find_marker(self, image):
         # detect the beacon color and the respective contour based on it
-        cnt, color = self.detect_color(image)   
-        
-        # compute the bounding box of the of the color region and return it 
+        cnt, color = self.detect_color(image)
+
+        # compute the bounding box of the of the color region and return it
         return (cv2.minAreaRect(cnt), cnt, color)
 
     # Calculate the angle between the AlphaBot and the detected Beacon
@@ -142,14 +153,14 @@ class Dna(object):
         c = a / b
         angle = math.asin(c)
         return angle
-    
-    # Calculate the distance between the AlphaBot and the detected Beacon 
+
+    # Calculate the distance between the AlphaBot and the detected Beacon
     def find_distance(self, knownWidth, focalLength, perWidth, distFromCentre):
         # compute and return the distance from the maker to the camera
         return ((knownWidth * focalLength) / perWidth) + distFromCentre
 
     # Calculate distance and agle between the Alphabot and the detected Beacon
-    def find_distance_and_angle(self, imagePath):   
+    def find_distance_and_angle(self, imagePath):
         print("Checking image: " + imagePath)
         # load the image, find the marker in the image, then compute the
         # distance to the marker from the camera
@@ -161,4 +172,4 @@ class Dna(object):
         print("Calculated Angle: %.2f Deg" % math.degrees(angle))
         print("Color Code: " + str(color))
 
-        return cms, math.degrees(angle), color 
+        return cms, math.degrees(angle), color
