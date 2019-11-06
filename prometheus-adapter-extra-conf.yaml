@@ -1,0 +1,8 @@
+rules:
+- seriesQuery: '{__name__="flask_http_request_total",pod!="",namespace!=""}'
+  resources:
+    template: <<.Resource>>
+  name:
+    matches: ^(.*)_total$
+    as: "${1}s_per_second"
+  metricsQuery: sum(rate(<<.Series>>{<<.LabelMatchers>>}[30s])) by (<<.GroupBy>>)
