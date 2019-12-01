@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-server-cv
+  labels:
+    app: edge-server-cv
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edge-server-cv
+  template:
+    metadata:
+      labels:
+        app: edge-server-cv
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - k-node1
+                - k-node2
+                - k-node3
+      containers:
+      - image: edge-server-cv:latest
+        name: edge-server-cv
+        resources:
+          limits:
+            cpu: "1900m"
+            memory: "3684692Ki"
+          requests:
+            cpu: "950m"
+            memory: "1842346Ki"
+        env:
+        - name: EDGE_SERVER_PORT
+          value: '8000'
+        ports:
+        - name: es-port
+          containerPort: 8000
+        imagePullPolicy: Never

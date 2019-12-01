@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-import requests
-import json
+from  multiprocessing import dummy
 import os
+import random
 import sys
 import time
-import random
+import requests
 
 IP_ADDR = os.getenv('EDGE_SERVER_IP_ADDR')
 if IP_ADDR is None:
@@ -22,28 +22,25 @@ IMAGES = []
 for (dirpath, dirnames, filenames) in os.walk(IMAGES_PATH):
     IMAGES.extend(filenames)
     break
-print 'Discovered images: %s' % str(IMAGES)
-
-RUNNING_SECONDS = float(os.getenv('RUNNING_PERIOD', '60'))
-RUNNING_INTERVAL = float(os.getenv('RUNNING_INTERVAL', '1'))
+print('Discovered images: {}'.format(IMAGES))
 
 def post_once():
     image = os.path.join(IMAGES_PATH, random.choice(IMAGES))
-    print 'Using image: %s' % str(image)
+    print('Using image: {}'.format(image))
     try:
         requests.post(POST_URL, files={"file": open(image, "rb")})
-    except requests.exceptions.ConnectionError as e:
-        print "Error while trying to post once: %s" % e
+    except requests.exceptions.ConnectionError as err:
+        print('Error while trying to post once: {}'.format(err))
+
+DURATION = float(os.getenv('DURATION', '60.0'))
+REQUESTS_PER_30 = float(os.getenv('REQUESTS_PER_30', '5.0'))
+POOL = dummy.Pool(16)
 
 def main():
     start_time = time.time()
-    while (time.time() - start_time) < RUNNING_SECONDS:
-        iteration_start_time = time.time()
-        post_once()
-        sleep_time = max(0, RUNNING_INTERVAL - (time.time() -
-                                                iteration_start_time))
-        print 'sleeping for %f' % sleep_time
-        time.sleep(sleep_time)
+    while (time.time() - start_time) < DURATION:
+        time.sleep(random.expovariate(REQUESTS_PER_30 / 30.0))
+        POOL.apply_async(post_once)
 
 if __name__ == "__main__":
     main()

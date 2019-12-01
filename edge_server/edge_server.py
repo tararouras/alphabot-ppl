@@ -1,56 +1,60 @@
 #!flask/bin/python
-from flask import Flask
-from flask import request, url_for
-from flask import jsonify, abort
-from dna import Dna
-from werkzeug.utils import secure_filename
-from alphabot_exceptions import *
+import string
 import os
-from prometheus_flask_exporter import PrometheusMetrics
+import random
+import flask
+from werkzeug import utils as wz_utils
+import prometheus_flask_exporter
+import alphabot_exceptions
+import dna
 
 DEFAULT_IP_ADDR = '192.168.1.114'
 DEFAULT_PORT = 8000
 
 IP_ADDR = os.getenv('EDGE_SERVER_IP_ADDR')
 if IP_ADDR is None:
-    print ("Environmemnt variable 'EDGE_SERVER_IP_ADDR' is not set, using "
-           "default ip: %s" % DEFAULT_IP_ADDR)
+    print("Environmemnt variable 'EDGE_SERVER_IP_ADDR' is not set, using "
+          "default ip: %s" % DEFAULT_IP_ADDR)
     IP_ADDR = DEFAULT_IP_ADDR
 
 PORT = os.getenv('EDGE_SERVER_PORT')
 if PORT is None:
-    print ("Environmemnt variable 'EDGE_SERVER_PORT' is not set, using "
-           "default port: %d" % DEFAULT_PORT)
+    print("Environmemnt variable 'EDGE_SERVER_PORT' is not set, using "
+          "default port: %d" % DEFAULT_PORT)
     PORT = DEFAULT_PORT
 else:
     PORT = int(PORT)
 
-D = Dna()
-app = Flask(__name__)
-PrometheusMetrics(app)
+D = dna.Dna()
+app = flask.Flask(__name__)
+prometheus_flask_exporter.PrometheusMetrics(app)
 
 
-@app.route('/', methods = ['GET', 'POST'])
+@app.route('/', methods=['GET', 'POST'])
 def post_image():
-    if request.method != 'POST':
-        return "%s \n" % request.method
+    if flask.request.method != 'POST':
+        return "%s \n" % flask.request.method
 
-    file = request.files['file']
-    filename = secure_filename(file.filename)
-    file.save(filename)
+    file = flask.request.files['file']
+    filename = wz_utils.secure_filename(file.filename)
+    random_string = ''.join(
+        random.choice(string.ascii_uppercase +
+                      string.digits) for _ in range(15))
+    final_image_name = '{}_{}'.format(filename, random_string)
+    file.save(final_image_name)
     dirr = os.getcwd()
     osname = os.path.join(dirr, '')
-    dest_img = osname + filename
+    dest_img = osname + final_image_name
     try:
         results = D.find_distance_and_angle(dest_img)  ### pairnei path
         os.remove(dest_img)
-        return jsonify(results)
-    except BeaconNotFoundError:
+        return flask.jsonify(results)
+    except alphabot_exceptions.BeaconNotFoundError:
         os.remove(dest_img)
-        return abort (404)
+        return flask.abort(404)
 
 def main():
-    app.run(host=IP_ADDR, port=PORT, threaded=False)
+    app.run(host=IP_ADDR, port=PORT, threaded=True)
 
 if __name__ == '__main__':
     main()
